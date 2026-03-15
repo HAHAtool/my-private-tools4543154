@@ -26,8 +26,10 @@
         
         .symbol-text { font-size: 16px; color: #e60012; font-weight: bold; background: #fff5f5; padding: 4px 10px; border: 1px dashed #e60012; border-radius: 4px; cursor: text; }
 
-        .main-btn { padding: 18px; background: linear-gradient(135deg, #e60012 0%, #b0000e 100%); color: white; border: none; border-radius: 8px; cursor: pointer; width: 100%; font-size: 20px; font-weight: bold; transition: 0.3s; }
-        .main-btn:hover { transform: translateY(-2px); box-shadow: 0 5px 15px rgba(230,0,18,0.3); }
+        .btn-group { display: flex; gap: 15px; width: 100%; }
+        .main-btn { padding: 18px; background: linear-gradient(135deg, #e60012 0%, #b0000e 100%); color: white; border: none; border-radius: 8px; cursor: pointer; flex: 2; font-size: 20px; font-weight: bold; transition: 0.3s; }
+        .download-all-btn { padding: 18px; background: linear-gradient(135deg, #333 0%, #000 100%); color: white; border: none; border-radius: 8px; cursor: pointer; flex: 1; font-size: 18px; font-weight: bold; transition: 0.3s; }
+        .main-btn:hover, .download-all-btn:hover { transform: translateY(-2px); box-shadow: 0 5px 15px rgba(0,0,0,0.2); }
 
         #output-container { display: flex; flex-direction: column; align-items: center; width: 100%; }
         .barcode-group { background: white; padding: 40px; display: flex; flex-direction: column; align-items: center; width: 500px; box-shadow: 0 0 10px rgba(0,0,0,0.05); }
@@ -159,7 +161,7 @@
                 </div>
             </div>
             <textarea id="noteContent" style="width: 98%; height: 120px; margin-top: 15px;">注意事項：
-• 逾期無效，請自行截圖留存，恕不補發
+• 逾期無效，請自行截圖留存，恕不補發。
 • 使用本券請至 XX 超商櫃檯直接出示本券掃碼兌換(請將螢幕亮度調到最大)，不接受手抄或口說序號方式兌換。
 • 憑券可至 XX 超商門市抵用消費金額，惟不得找零或兌換現金。抵用券遺失、毀損或逾使用期限，恕不補發或提供折抵。
 • 紅利點數一經兌換，即無法再更換為其他抵用券、兌換券或退回紅利點數。如對紅利點數有任何疑問，請逕洽詢紅利點數服務商。
@@ -174,13 +176,15 @@
             <textarea id="inputData" style="width: 98%; height: 120px;" placeholder="格式：序號a,序號b,序號c (每行一組)"></textarea>
         </div>
 
-        <button class="main-btn" onclick="generate()">立即套用設定並生成</button>
+        <div class="btn-group">
+            <button class="main-btn" onclick="generate()">立即產生</button>
+            <button class="download-all-btn" onclick="downloadAll()">一鍵下載所有</button>
+        </div>
     </div>
 
     <div id="output-container"></div>
 
     <script>
-        // 設定預設日期
         window.onload = function() {
             const today = new Date();
             const yyyy = today.getFullYear();
@@ -191,14 +195,13 @@
 
         let logoSource = null;
 
-        // 處理 Logo 檔案上傳
         document.getElementById('logoUpload').addEventListener('change', function(e) {
             const file = e.target.files[0];
             if (file) {
                 const reader = new FileReader();
                 reader.onload = (event) => { logoSource = event.target.result; };
                 reader.readAsDataURL(file);
-                document.getElementById('logoUrl').value = ""; // 清空網址欄
+                document.getElementById('logoUrl').value = "";
             }
         });
 
@@ -236,7 +239,6 @@
                 groupDiv.className = 'barcode-group';
                 groupDiv.id = `card-${rowIndex}`;
 
-                // Logo
                 if (finalLogo) {
                     const img = document.createElement('img');
                     img.src = finalLogo;
@@ -246,7 +248,6 @@
                     groupDiv.appendChild(img);
                 }
 
-                // 標題
                 const promo = document.createElement('div');
                 promo.className = 'promo-text';
                 promo.innerText = config.title;
@@ -255,7 +256,6 @@
                 promo.style.marginBottom = config.tSpace + 'px';
                 groupDiv.appendChild(promo);
 
-                // 條碼
                 for (let i = 0; i < config.count; i++) {
                     if (i > 0) {
                         const spacer = document.createElement('div');
@@ -267,7 +267,6 @@
                     groupDiv.appendChild(svg);
                 }
 
-                // 效期文字
                 const expiry = document.createElement('div');
                 expiry.className = 'expiry-text';
                 expiry.innerText = config.expiry;
@@ -276,7 +275,6 @@
                 expiry.style.marginTop = config.eSpace + 'px';
                 groupDiv.appendChild(expiry);
 
-                // 注意事項
                 const noteDiv = document.createElement('div');
                 noteDiv.className = 'note-container';
                 noteDiv.style.color = config.nColor;
@@ -289,7 +287,7 @@
                 const btn = document.createElement('button');
                 btn.className = 'download-btn';
                 btn.innerText = `下載圖檔 (${rowIndex + 1})`;
-                btn.onclick = () => downloadImage(`card-${rowIndex}`, `barcode-${rowIndex}.png`);
+                btn.onclick = () => downloadImage(`card-${rowIndex}`, `${parts[0]}.png`);
                 container.appendChild(btn);
 
                 for (let i = 0; i < config.count; i++) {
@@ -309,12 +307,28 @@
 
         function downloadImage(elementId, fileName) {
             const element = document.getElementById(elementId);
-            html2canvas(element, { scale: 2, useCORS: true }).then(canvas => {
+            return html2canvas(element, { scale: 2, useCORS: true }).then(canvas => {
                 const link = document.createElement('a');
                 link.download = fileName;
                 link.href = canvas.toDataURL("image/png");
                 link.click();
             });
+        }
+
+        // 新增：下載所有功能
+        async function downloadAll() {
+            const buttons = document.querySelectorAll('.download-btn');
+            if (buttons.length === 0) {
+                alert("請先產生條碼！");
+                return;
+            }
+            
+            for (let i = 0; i < buttons.length; i++) {
+                // 模擬點擊下載按鈕
+                buttons[i].click();
+                // 稍微延遲避免瀏覽器負載過重
+                await new Promise(resolve => setTimeout(resolve, 100));
+            }
         }
     </script>
 </body>
