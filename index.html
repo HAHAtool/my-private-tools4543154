@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <title>條碼產生器</title>
+    <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+    <style>
+        body { font-family: "Microsoft JhengHei", Arial, sans-serif; padding: 20px; background-color: #f4f7f6; display: flex; flex-direction: column; align-items: center; }
+        .controls { background: white; padding: 25px; border-radius: 15px; box-shadow: 0 10px 30px rgba(0,0,0,0.08); width: 100%; max-width: 950px; margin-bottom: 20px; }
+        
+        .section { margin-bottom: 25px; border: 1px solid #eee; padding: 20px; border-radius: 10px; background-color: #fff; }
+        .section-title { font-size: 18px; font-weight: bold; color: #333; margin-bottom: 15px; padding-bottom: 10px; border-bottom: 2px solid #e60012; display: flex; align-items: center; }
+        .section-title::before { content: ""; width: 4px; height: 18px; background: #e60012; margin-right: 10px; border-radius: 2px; }
+
+        .config-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 15px; }
+        .control-group { display: flex; flex-direction: column; gap: 8px; }
+        .inline-group { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+        
+        label { font-size: 14px; font-weight: bold; color: #555; }
+        input[type="text"], input[type="number"], select, textarea { padding: 10px; border: 1px solid #ddd; border-radius: 6px; font-size: 14px; }
+        input[type="color"] { width: 40px; height: 40px; border: none; padding: 0; cursor: pointer; background: none; }
+        .color-code { font-family: monospace; font-size: 14px; color: #666; background: #f0f0f0; padding: 2px 6px; border-radius: 4px; }
+        
+        .symbol-text { font-size: 16px; color: #e60012; font-weight: bold; background: #fff5f5; padding: 4px 10px; border: 1px dashed #e60012; border-radius: 4px; cursor: text; }
+
+        .main-btn { padding: 18px; background: linear-gradient(135deg, #e60012 0%, #b0000e 100%); color: white; border: none; border-radius: 8px; cursor: pointer; width: 100%; font-size: 20px; font-weight: bold; transition: 0.3s; }
+        .main-btn:hover { transform: translateY(-2px); box-shadow: 0 5px 15px rgba(230,0,18,0.3); }
+
+        #output-container { display: flex; flex-direction: column; align-items: center; width: 100%; }
+        .barcode-group { background: white; padding: 40px; display: flex; flex-direction: column; align-items: center; width: 500px; box-shadow: 0 0 10px rgba(0,0,0,0.05); }
+        .promo-text { font-weight: bold; text-align: center; width: 100%; }
+        .note-container { width: 100%; font-size: 13px; line-height: 1.6; white-space: pre-wrap; }
+        .download-btn { margin: 15px 0 40px 0; padding: 10px 25px; background-color: #333; color: white; border: none; border-radius: 6px; cursor: pointer; }
+        
+        @media print { .controls, .download-btn { display: none; } }
+    </style>
+</head>
+<body>
+
+    <div class="controls">
+        <h1 style="text-align: center; color: #333;">條碼產生器</h1>
+
+        <div class="section">
+            <div class="section-title">基本樣式</div>
+            <div class="config-grid">
+                <div class="control-group">
+                    <label>上傳 LOGO</label>
+                    <input type="file" id="logoUpload" accept="image/*">
+                </div>
+                <div class="control-group">
+                    <label>標題文字</label>
+                    <input type="text" id="promoTitle" value="$25 紅利購物金">
+                </div>
+                <div class="control-group">
+                    <label>標題顏色</label>
+                    <div class="inline-group">
+                        <input type="color" id="titleColor" value="#e60012" oninput="titleColorHex.innerText=this.value.toUpperCase()">
+                        <span class="color-code" id="titleColorHex">#E60012</span>
+                    </div>
+                </div>
+                <div class="control-group">
+                    <label>LOGO 寬度 (<span id="v_logoSize">200</span>px)</label>
+                    <input type="range" id="logoSize" min="50" max="450" value="200" oninput="v_logoSize.innerText=this.value">
+                </div>
+                <div class="control-group">
+                    <label>標題大小 (<span id="v_titleSize">26</span>px)</label>
+                    <input type="range" id="titleSize" min="10" max="80" value="26" oninput="v_titleSize.innerText=this.value">
+                </div>
+                <div class="control-group">
+                    <label>標題上下間距 (<span id="v_titleSpace">40</span>px)</label>
+                    <input type="range" id="titleSpace" min="0" max="100" value="40" oninput="v_titleSpace.innerText=this.value">
+                </div>
+            </div>
+        </div>
+
+        <div class="section">
+            <div class="section-title">條碼規格</div>
+            <div class="config-grid">
+                <div class="control-group">
+                    <label>條碼數量</label>
+                    <select id="barcodeCount">
+                        <option value="1">1 條</option>
+                        <option value="2" selected>2 條</option>
+                        <option value="3">3 條</option>
+                    </select>
+                </div>
+                <div class="control-group">
+                    <label>條碼類型</label>
+                    <select id="barcodeType">
+                        <option value="CODE39">CODE-39</option>
+                        <option value="CODE128">CODE-128</option>
+                    </select>
+                </div>
+                <div class="control-group">
+                    <label>條形寬度 (<span id="v_width">2</span>)</label>
+                    <input type="range" id="barWidth" min="1" max="4" step="0.1" value="2" oninput="v_width.innerText=this.value">
+                </div>
+                <div class="control-group">
+                    <label>條形高度 (<span id="v_height">60</span>px)</label>
+                    <input type="range" id="barHeight" min="20" max="150" value="60" oninput="v_height.innerText=this.value">
+                </div>
+                <div class="control-group">
+                    <label>條碼序號字體 (<span id="v_font">16</span>px)</label>
+                    <input type="range" id="fontSize" min="10" max="40" value="16" oninput="v_font.innerText=this.value">
+                </div>
+                <div class="control-group">
+                    <label>條碼彼此間距 (<span id="v_barSpace">30</span>px)</label>
+                    <input type="range" id="barSpace" min="0" max="100" value="30" oninput="v_barSpace.innerText=this.value">
+                </div>
+            </div>
+        </div>
+
+        <div class="section">
+            <div class="section-title">注意事項內容</div>
+            <div class="config-grid">
+                <div class="control-group">
+                    <label>內容顏色</label>
+                    <div class="inline-group">
+                        <input type="color" id="noteColor" value="#555555" oninput="noteColorHex.innerText=this.value.toUpperCase()">
+                        <span class="color-code" id="noteColorHex">#555555</span>
+                    </div>
+                </div>
+                <div class="control-group">
+                    <label>常用符號 (可直接複製使用)</label>
+                    <div class="inline-group">
+                        <span class="symbol-text">● • · ○ -</span>
+                    </div>
+                </div>
+            </div>
+            <textarea id="noteContent" style="width: 98%; height: 120px; margin-top: 15px;">注意事項：
+● 逾期無效，請自行截圖留存，恕不補發
+● 使用本券請至 XX 超商櫃檯直接出示本券掃碼兌換(請將螢幕亮度調到最大)，不接受手抄或口說序號方式兌換。
+● 憑券可至 XX 超商門市抵用消費金額，惟不得找零或兌換現金。抵用券遺失、毀損或逾使用期限，恕不補發或提供折抵。
+● 紅利點數一經兌換，即無法再更換為其他抵用券、兌換券或退回紅利點數。如對紅利點數有任何疑問，請逕洽詢紅利點數服務商。
+● 本券為不記名，任何人持本券皆可使用，請自行妥善保管，如遭他人盜用，本券不再補發。
+● 商品兌換後，無法提供退貨及換貨。
+● 本券有效與否，以發行人票券系統所記錄之狀態為憑。 如系統因網路連線有所遲延，依兌換商家系統端資訊為準。
+●  XX 超商保留活動修改之權利，如有任何問題，請洽 XX 超商客服專線 0800-000000 。</textarea>
+        </div>
+
+        <div class="section">
+            <div class="section-title">輸入序號</div>
+            <textarea id="inputData" style="width: 98%; height: 120px;" placeholder="格式：序號a,序號b,序號c (每行一組)"></textarea>
+        </div>
+
+        <button class="main-btn" onclick="generate()">立即套用設定並生成</button>
+    </div>
+
+    <div id="output-container"></div>
+
+    <script>
+        let logoBase64 = null;
+        document.getElementById('logoUpload').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = (event) => { logoBase64 = event.target.result; };
+                reader.readAsDataURL(file);
+            }
+        });
+
+        function generate() {
+            const container = document.getElementById('output-container');
+            const config = {
+                title: document.getElementById('promoTitle').value,
+                tColor: document.getElementById('titleColor').value,
+                nColor: document.getElementById('noteColor').value,
+                note: document.getElementById('noteContent').value,
+                count: parseInt(document.getElementById('barcodeCount').value),
+                type: document.getElementById('barcodeType').value,
+                lSize: document.getElementById('logoSize').value,
+                tSize: document.getElementById('titleSize').value,
+                tSpace: document.getElementById('titleSpace').value,
+                bSpace: document.getElementById('barSpace').value,
+                bWidth: parseFloat(document.getElementById('barWidth').value),
+                bHeight: parseInt(document.getElementById('barHeight').value),
+                fSize: parseInt(document.getElementById('fontSize').value)
+            };
+
+            const rows = document.getElementById('inputData').value.split('\n').filter(r => r.trim() !== "");
+            container.innerHTML = ""; 
+
+            rows.forEach((row, rowIndex) => {
+                const parts = row.split(',').map(p => p.trim());
+                const groupDiv = document.createElement('div');
+                groupDiv.className = 'barcode-group';
+                groupDiv.id = `card-${rowIndex}`;
+
+                // Logo 判斷：僅在有圖片時產生
+                if (logoBase64) {
+                    const img = document.createElement('img');
+                    img.src = logoBase64;
+                    img.style.width = config.lSize + 'px';
+                    img.style.marginBottom = config.tSpace + 'px';
+                    img.style.display = 'block';
+                    groupDiv.appendChild(img);
+                }
+
+                const promo = document.createElement('div');
+                promo.className = 'promo-text';
+                promo.innerText = config.title;
+                promo.style.fontSize = config.tSize + 'px';
+                promo.style.color = config.tColor;
+                promo.style.marginBottom = config.tSpace + 'px';
+                groupDiv.appendChild(promo);
+
+                for (let i = 0; i < config.count; i++) {
+                    if (i > 0) {
+                        const spacer = document.createElement('div');
+                        spacer.style.height = config.bSpace + 'px';
+                        groupDiv.appendChild(spacer);
+                    }
+                    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+                    svg.id = `svg-${rowIndex}-${i}`;
+                    groupDiv.appendChild(svg);
+                }
+
+                const noteDiv = document.createElement('div');
+                noteDiv.className = 'note-container';
+                noteDiv.style.color = config.nColor;
+                noteDiv.style.marginTop = config.tSpace + 'px';
+                noteDiv.innerText = config.note;
+                groupDiv.appendChild(noteDiv);
+
+                container.appendChild(groupDiv);
+
+                const btn = document.createElement('button');
+                btn.className = 'download-btn';
+                btn.innerText = `下載圖檔 (${rowIndex + 1})`;
+                btn.onclick = () => downloadImage(`card-${rowIndex}`, `barcode-${rowIndex}.png`);
+                container.appendChild(btn);
+
+                for (let i = 0; i < config.count; i++) {
+                    if (parts[i]) {
+                        JsBarcode(`#svg-${rowIndex}-${i}`, parts[i], {
+                            format: config.type,
+                            width: config.bWidth,
+                            height: config.bHeight,
+                            displayValue: true,
+                            fontSize: config.fSize,
+                            margin: 10
+                        });
+                    }
+                }
+            });
+        }
+
+        function downloadImage(elementId, fileName) {
+            const element = document.getElementById(elementId);
+            html2canvas(element, { scale: 2, useCORS: true }).then(canvas => {
+                const link = document.createElement('a');
+                link.download = fileName;
+                link.href = canvas.toDataURL("image/png");
+                link.click();
+            });
+        }
+    </script>
+</body>
+</html>
